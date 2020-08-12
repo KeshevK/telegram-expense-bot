@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os, re, hashlib, datetime
+import os, re, hashlib, datetime, logging
 import telebot
 
 import google.auth
@@ -15,9 +15,26 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_KEY"))
 
+def write_google_sheet_col_headers(latest_tracker_message):
+    spreadsheet_id = os.getenv("SPREADSHEET_ID")
+    end_col = chr(ord('a') + len(latest_tracker_message)).upper()
+    range_name = 'Sheet1!A1:{}1'.format(end_col)
+    response = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+    if not response.get("values"):
+        body = {"values":latest_tracker_message.keys()}
+        spreadsheet_id = os.getenv("SPREADSHEET_ID")
+        result = service.spreadsheets().values().append(
+            spreadsheetId=spreadsheet_id, range=range_name,
+            valueInputOption="USER_ENTERED",
+            body=body).execute()
+        logging.info("COLUMN HEADERS FIRST WRITE TO SPREADSHEET {}".format(spreadsheet_id))
+
+
+
 def update_google_sheet_tracker(latest_tracker_message):
     tracker_message_arr = [[v for k,v in latest_tracker_message.items() if k!="attributes"]]
     range_name = "Sheet1"
+    write_google_sheet_col_headers(latest_tracker_message)
     update_google_sheet_with_message(tracker_message_arr, range_name)
 
 def update_google_sheet_with_message(values_as_arr, range_name): 
@@ -31,19 +48,19 @@ def update_google_sheet_with_message(values_as_arr, range_name):
         'values': values_as_arr
     }
     spreadsheet_id = os.getenv("SPREADSHEET_ID")
-    print(spreadsheet_id)
+
     result = service.spreadsheets().values().append(
         spreadsheetId=spreadsheet_id, range=range_name,
         valueInputOption="USER_ENTERED",
         body=body).execute()
-    print('{0} cells appended.'.format(result \
+    logging.info('{0} cells appended.'.format(result \
                                         .get('updates') \
                                         .get('updatedCells')))
 
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    print(message)
+
     bot.reply_to(message, u"Congats! You've made your first bot!")
 
 #@bot.message_handler(regexp=command_regex_config["tracker"])
